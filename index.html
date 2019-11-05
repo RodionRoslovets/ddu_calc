@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+
+<body>
+    <div class="calc">
+        <div class="calc-wrapper">
+            <div class="calc-row">
+                <div class="field-name">Цена квартиры по ДДУ</div>
+                <div class="field"><input type="text" id="price" placeholder="Цена"></div>
+            </div>
+            <div class="calc-row">
+                <div class="field-name">Дата передачи квартиры по ДДУ</div>
+                <div class="field"><input type="text" id="date1" placeholder="ДД.ММ.ГГГГ"></div>
+            </div>
+            <div class="calc-row">
+                <div class="field-name">Дата подписания акта приема-передачи</div>
+                <div class="field"><input type="text" id="date2" placeholder="ДД.ММ.ГГГГ"></div>
+            </div>
+            <div class="calc-row">
+                <div class="field-name">Статус дольщика</div>
+                <div class="field">
+                    <select>
+                        <option value="2" class="ur-form">Физическое лицо</option>
+                        <option value="1" class="ur-form">Юридическое лицо</option>
+                    </select>
+                </div>
+            </div>
+            <div class="calc-row">
+                <div class="field-name">Применять ключевую ставку</div>
+                <div class="field">
+                    <select>
+                        <option value="1" class="rate">По периодам действия ставки</option>
+                        <option value="2" class="rate">На день наступления обязательств</option>
+                        <option value="3" class="rate">На день фактического исполнения</option>
+                    </select>
+                </div>
+            </div>
+            <div class="calc-row">
+                <button id='button'>Расчет</button>
+                <button id="reset">Очистить</button>
+            </div>
+            <div class="result">
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="3">Период просрочки</th>
+                            <th rowspan="2">Ставка</th>
+                            <th rowspan="2">Неустойка за период</th>
+                        </tr>
+                        <tr>
+                            <th>С</th>
+                            <th>По</th>
+                            <th>Дней</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result-table-body">
+                    </tbody>
+
+                </table>
+                <div class="overlay">
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+    <style>
+        .calc {
+            font-family: "Open Sans", sans-serif;
+            font-size: 14px;
+            background: #000;
+            color: #fff;
+            padding: 100px 0px;
+        }
+
+        .calc-wrapper {
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .field input,
+        .field select,
+        .field select option {
+            border: 1px solid #7a7a7a;
+            background: #000;
+            padding: 10px 15px;
+            color: #fff;
+            transition: all .2s linear;
+        }
+
+        .field input:focus {
+            border: 1px solid #fff;
+        }
+
+        .field input::-webkit-input-placeholder {
+            color: #fff;
+        }
+
+        .field input::-ms-input-placeholder {
+            color: #fff;
+        }
+
+        .field input::-moz-input-placeholder {
+            color: #fff;
+        }
+
+        .calc-row button {
+            background-color: #6146D6;
+            border: none;
+            color: #fff;
+            text-transform: uppercase;
+            width: 40%;
+            padding: 15px 30px;
+            transition: background-color .2s linear;
+            cursor: pointer;
+        }
+
+        .calc-row button:hover {
+            background-color: #202020;
+        }
+
+        .result {
+            position: relative;
+        }
+
+        .result table {
+            width: 100%;
+        }
+
+        .result td,
+        .result th {
+            padding: 10px;
+        }
+
+        .result th,
+        .result td,
+        .result th,
+        .result table {
+            border-collapse: collapse;
+            border: 1px solid #fff;
+        }
+
+        .overlay {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            opacity: 1;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: all .2s linear;
+        }
+
+        .active {
+            height: 0;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script>
+        let price = document.getElementById('price'),
+            day1 = document.getElementById('date1'),
+            day2 = document.getElementById('date2'),
+            urForm = document.getElementsByClassName('ur-form'),
+            rate = document.getElementsByClassName('rate'),
+            resetBtn = document.getElementById('reset'),
+            button = document.getElementById('button'),
+            resultTableBody = document.getElementById('result-table-body'),
+            overlay = document.getElementsByClassName('overlay')[0],
+            ratePeriods = [//period obj
+                {
+                    begin: new Date(2012, 08, 14),
+                    end: new Date(2015, 11, 31),
+                    percentVal: 8.25,
+                    days: 1203
+                }, {
+                    begin: new Date(2016, 00, 01),
+                    end: new Date(2016, 05, 13),
+                    percentVal: 11,
+                    days: 164
+                }, {
+                    begin: new Date(2016, 05, 14),
+                    end: new Date(2016, 08, 18),
+                    percentVal: 10.5,
+                    days: 96
+                }, {
+                    begin: new Date(2016, 08, 19),
+                    end: new Date(2017, 02, 26),
+                    percentVal: 10,
+                    days: 188
+                }, {
+                    begin: new Date(2017, 02, 27),
+                    end: new Date(2017, 04, 01),
+                    percentVal: 9.75,
+                    days: 35
+                }, {
+                    begin: new Date(2017, 04, 02),
+                    end: new Date(2017, 05, 18),
+                    percentVal: 9.25,
+                    days: 47
+                }, {
+                    begin: new Date(2017, 05, 19),
+                    end: new Date(2017, 08, 17),
+                    percentVal: 9,
+                    days: 90
+                }, {
+                    begin: new Date(2017, 08, 18),
+                    end: new Date(2017, 09, 29),
+                    percentVal: 8.5,
+                    days: 41
+                }, {
+                    begin: new Date(2017, 09, 30),
+                    end: new Date(2017, 11, 17),
+                    percentVal: 8.25,
+                    days: 48
+                }, {
+                    begin: new Date(2017, 11, 18),
+                    end: new Date(2018, 01, 11),
+                    percentVal: 7.75,
+                    days: 55
+                }, {
+                    begin: new Date(2018, 01, 12),
+                    end: new Date(2018, 02, 26),
+                    percentVal: 7.5,
+                    days: 42
+                }, {
+                    begin: new Date(2018, 02, 27),
+                    end: new Date(2018, 08, 16),
+                    percentVal: 7.25,
+                    days: 173
+                }, {
+                    begin: new Date(2018, 08, 17),
+                    end: new Date(2018, 11, 16),
+                    percentVal: 7.5,
+                    days: 90
+                }, {
+                    begin: new Date(2018, 11, 17),
+                    end: new Date(2019, 05, 16),
+                    percentVal: 7.75,
+                    days: 181
+                }, {
+                    begin: new Date(2019, 05, 17),
+                    end: new Date(2019, 12, 31),
+                    percentVal: 7.5,
+                    days: 1
+                }
+            ], appData = [];
+
+        resetBtn.addEventListener('click', function () {
+            price.value = '';
+            day1.value = '';
+            day2.value = '';
+            resultTableBody.innerHTML = '';
+            overlay.classList.remove('active');
+        });
+
+        button.addEventListener('click', function () {
+
+            overlay.classList.remove('active');
+            overlay.classList.remove('hidden');
+            resultTableBody.innerHTML = '';
+
+            if (price.value == '' || day1.value == '' || day2.value == '') {
+                alert('Пожалуйста, заполните все поля');
+            }
+            let percent,
+                rateVal,
+                urFormSel,
+                date1Day = day1.value.slice(0, 2),
+                date1Month = +(day1.value.slice(3, 5)) - 1,
+                date1Year = day1.value.slice(6, 10),
+                date2Day = day2.value.slice(0, 2),
+                date2Month = +(day2.value.slice(3, 5)) - 1,
+                date2Year = day2.value.slice(6, 10),
+                dateFirst = new Date(date1Year, date1Month, date1Day),
+                dateSecond = new Date(date2Year, date2Month, date2Day),
+                dateResult = Math.floor((dateSecond - dateFirst) / 1000 / 60 / 60 / 24),
+                firstPeriod,
+                result = 0,
+                lastPeriod,
+                periodsCount = [0];
+
+            for (let i = 0; i < urForm.length; i++) {
+                if (urForm[i].selected) {
+                    urFormSel = +urForm[i].value;
+                }
+            }
+
+            for (let i = 0; i < rate.length; i++) {
+                if (rate[i].selected) {
+                    rateVal = +rate[i].value;
+                    break
+                }
+            }
+            //add zero in day and month
+            function chekDate(a){
+                if(a >= 1 && a <= 9){
+                    a = '0' + a;
+                    return a;
+                } else {
+                    return a;
+                }
+            }
+            if (rateVal == 1) {
+                for (let i = 0; i < ratePeriods.length; i++) {
+                    if (dateFirst >= ratePeriods[i].begin && dateFirst <= ratePeriods[i].end) {
+                        firstPeriod = i;
+                        break
+                    }
+                }
+                for (let i = 0; i < ratePeriods.length; i++) {
+                    if (dateSecond >= ratePeriods[i].begin && dateSecond <= ratePeriods[i].end) {
+                        lastPeriod = i;
+                        break
+                    }
+                }
+                for (let i = 0; i <= (lastPeriod - firstPeriod); firstPeriod++) {
+                    if (periodsCount[0] == 0) {
+                        periodsCount[0] += +(((price.value / 100) * +ratePeriods[firstPeriod].percentVal) / 300) * urFormSel * +((ratePeriods[firstPeriod].end - dateFirst) / 1000 / 60 / 60 / 24);
+                        appData.push({
+                            begin: chekDate(dateFirst.getDate()) + '.' + chekDate((dateFirst.getMonth() + 1)) + '.' + dateFirst.getFullYear(),
+                            end: chekDate(ratePeriods[firstPeriod].end.getDate()) + '.' + chekDate((ratePeriods[firstPeriod].end.getMonth() + 1)) + '.' + ratePeriods[firstPeriod].end.getFullYear(),
+                            days: +(ratePeriods[firstPeriod].end - dateFirst) / 1000 / 60 / 60 / 24,
+                            percentVal: +ratePeriods[firstPeriod].percentVal,
+                            eq: +(periodsCount[0].toFixed(2))
+                        });
+                    } else if (lastPeriod == firstPeriod) {
+                        periodsCount.push(+((price.value / 100 * +ratePeriods[firstPeriod].percentVal) / 300) * urFormSel * +((dateSecond - ratePeriods[firstPeriod].begin) / 1000 / 60 / 60 / 24));
+                        appData.push({
+                            begin: chekDate(ratePeriods[firstPeriod].begin.getDate()) + '.' + chekDate((ratePeriods[firstPeriod].begin.getMonth() + 1)) + '.' + ratePeriods[firstPeriod].begin.getFullYear(),
+                            end: chekDate(dateSecond.getDate()) + '.' + chekDate((dateSecond.getMonth() + 1)) + '.' + dateSecond.getFullYear(),
+                            days: +(dateSecond - ratePeriods[firstPeriod].begin) / 1000 / 60 / 60 / 24,
+                            percentVal: +ratePeriods[firstPeriod].percentVal,
+                            eq: +(periodsCount[periodsCount.length - 1].toFixed(2))
+                        });
+                    } else {
+                        periodsCount.push(+((price.value / 100 * +ratePeriods[firstPeriod].percentVal) / 300) * urFormSel * ratePeriods[firstPeriod].days);
+                        appData.push({
+                            begin: chekDate(ratePeriods[firstPeriod].begin.getDate()) + '.' + chekDate((ratePeriods[firstPeriod].begin.getMonth()) + 1) + '.' + ratePeriods[firstPeriod].begin.getFullYear(),
+                            end: chekDate(ratePeriods[firstPeriod].end.getDate()) + '.' + chekDate((ratePeriods[firstPeriod].end.getMonth() + 1)) + '.' + ratePeriods[firstPeriod].end.getFullYear(),
+                            days: +(ratePeriods[firstPeriod].days),
+                            percentVal: +ratePeriods[firstPeriod].percentVal,
+                            eq: +(((price.value / 100 * +ratePeriods[firstPeriod].percentVal) / 300) * urFormSel * ratePeriods[firstPeriod].days).toFixed(2)
+                        });
+                    }
+
+                }
+                for (let i = 0; i < periodsCount.length; i++) {
+                    result += periodsCount[i];
+                    if (isNaN(result)) {
+                        alert('Проверьте введенные данные');
+                    }
+                }
+                addTable(1);
+            }
+
+            if (rateVal == 2) {
+                for (let i = 0; i < ratePeriods.length; i++) {
+                    if (dateFirst >= ratePeriods[i].begin && dateFirst <= ratePeriods[i].end) {
+                        percent = +ratePeriods[i].percentVal;
+                        break
+                    }
+                }
+                countRes();
+                appData.push({
+                    begin: chekDate(dateFirst.getDate()) + '.' + chekDate((dateFirst.getMonth() + 1)) + '.' + dateFirst.getFullYear(),
+                    end: chekDate(dateSecond.getDate()) + '.' + chekDate((dateSecond.getMonth() + 1)) + '.' + dateSecond.getFullYear(),
+                    days: +(dateResult),
+                    percentVal: +percent
+                });
+                addTable(0);
+            }
+            if (rateVal == 3) {
+                for (let i = 0; i < ratePeriods.length; i++) {
+                    if (dateSecond >= ratePeriods[i].begin && dateSecond <= ratePeriods[i].end) {
+                        percent = +ratePeriods[i].percentVal;
+                        break
+                    }
+                }
+                countRes();
+                appData.push({
+                    begin: chekDate(dateFirst.getDate()) + '.' + chekDate((dateFirst.getMonth() + 1)) + '.' + dateFirst.getFullYear(),
+                    end: chekDate(dateSecond.getDate()) + '.' + chekDate((dateSecond.getMonth() + 1)) + '.' + dateSecond.getFullYear(),
+                    days: +(dateResult),
+                    percentVal: +percent
+                });
+                addTable(0);
+            }
+
+            function countRes() {
+                let priceEnd = +(price.value / 100 * percent) / 300;
+
+                result = priceEnd * urFormSel * dateResult;
+
+                if (isNaN(result)) {
+                    alert('Проверьте введенные данные');
+                }
+            }
+            function addTable(a) {
+                if (a == 1) {
+                    for (let i = 0; i < appData.length; i++) {
+                        let tableRow = document.createElement('tr');
+                        tableRow.innerHTML = '<td>' + appData[i].begin + '</td>' + '<td>' + appData[i].end + '</td>' + '<td>' + appData[i].days + '</td>' + '<td>' + appData[i].percentVal + '%</td>' + '<td>' + appData[i].eq.toFixed(2) + ' руб</td>';
+                        resultTableBody.appendChild(tableRow);
+                    }
+
+                    let tablefooter = document.createElement('tr');
+                    tablefooter.innerHTML = '<td colspan="4">ИТОГО:</td><td>' + result.toFixed(2) + ' руб</td>';
+                    resultTableBody.appendChild(tablefooter);
+                } else {
+                    let tableRow = document.createElement('tr');
+                    tableRow.innerHTML = '<td>' + appData[0].begin + '</td>' + '<td>' + appData[0].end + '</td>' + '<td>' + appData[0].days + '</td>' + '<td>' + appData[0].percentVal + '%</td>' + '<td>' + result.toFixed(2) + ' руб</td>';
+                    resultTableBody.appendChild(tableRow);
+
+                    var tablefooter = document.createElement('tr');
+                    tablefooter.innerHTML = '<td colspan="4">ИТОГО:</td><td>' + result.toFixed(2) + ' руб</td>';
+                    resultTableBody.appendChild(tablefooter);
+                }
+            }
+
+            appData = [];
+            overlay.classList.add('active');
+            setTimeout(function () {
+                overlay.classList.add('hidden');
+            }, 100);
+
+        });
+
+
+    </script>
+</body>
+
+</html>
